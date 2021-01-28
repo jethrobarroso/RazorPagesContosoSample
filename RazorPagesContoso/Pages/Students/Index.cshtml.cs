@@ -1,7 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using RazorPagesContoso.Data;
 using RazorPagesContoso.Models;
 using System.Collections.Generic;
@@ -13,20 +11,53 @@ namespace RazorPagesContoso.Pages.Students
     public class IndexModel : PageModel
     {
         private readonly SchoolContext _context;
-        private readonly MvcOptions _mvcOptions;
 
-        public IndexModel(SchoolContext context, IOptions<MvcOptions> mvcOptions)
+        public IndexModel(SchoolContext context)
         {
             _context = context;
-            _mvcOptions = mvcOptions.Value;
         }
 
-        public IList<Student> Student { get; set; }
+        public string NameSort { get; set; }
+        public string DateSort { get; set; }
+        public string CurrentFilter { get; set; }
+        public string CurrentSort { get; set; }
 
-        public async Task OnGetAsync()
+        public IList<Student> Students { get; set; }
+
+        public async Task OnGetAsync(string sortOrder, string searchString)
         {
-            Student = await _context.Students.Take(
-                _mvcOptions.MaxModelBindingCollectionSize).ToListAsync();
+            // using System;
+            NameSort = string.IsNullOrEmpty(sortOrder) ? "name_desc" : "";
+            DateSort = sortOrder == "Date" ? "date_desc" : "Date";
+
+            CurrentFilter = searchString;
+
+            IQueryable<Student> studentsIQ = from s in _context.Students
+                                             select s;
+
+            if (!string.IsNullOrEmpty(searchString))
+            {
+                studentsIQ = studentsIQ.Where(s => s.LastName.Contains(searchString)
+                                       || s.FirstMidName.Contains(searchString));
+            }
+
+            switch (sortOrder)
+            {
+                case "name_desc":
+                    studentsIQ = studentsIQ.OrderByDescending(s => s.LastName);
+                    break;
+                case "Date":
+                    studentsIQ = studentsIQ.OrderBy(s => s.EnrollmentDate);
+                    break;
+                case "date_desc":
+                    studentsIQ = studentsIQ.OrderByDescending(s => s.EnrollmentDate);
+                    break;
+                default:
+                    studentsIQ = studentsIQ.OrderBy(s => s.LastName);
+                    break;
+            }
+
+            Students = await studentsIQ.AsNoTracking().ToListAsync();
         }
     }
 }
